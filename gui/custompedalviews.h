@@ -1,7 +1,4 @@
 #pragma once
-#include <iomanip>
-#include <sstream>
-
 #include "../dsp/utilities.h"
 #include "vstgui/vstgui.h"
 #include "vstgui/vstgui_uidescription.h" // for IController
@@ -141,6 +138,26 @@ namespace VSTGUI
         // The On/Off Status LED
         COnOffButton* indicator = nullptr;
     };
+    
+    /**
+    \class KnobLabelPair
+    \author Steve Dwyer
+    \version Revision : 1.0
+    \date Date : 2021-12-27
+    */
+    class KnobLabelPair
+    {
+    public:
+        /** KnobLabelPair constructor (default) */
+        KnobLabelPair() = default;
+        ~KnobLabelPair() = default;
+
+        // The Knob
+        CAnimKnob* knob = nullptr;
+
+        // The TextLabel
+        CTextEdit* text = nullptr;
+    };
 
     /**
     \class VariableToolTipKnobController
@@ -180,16 +197,27 @@ namespace VSTGUI
 
         ~VariableToolTipKnobController() override
         {
-            knobs.clear();
+            knobLabelPairs.clear();
         }
 
         /** test to see if control is in the list of controls
         \param control - control to test
         \return true if control is in list, false otherwise
         */
-        bool isManagedControl(CControl* control)
+        KnobLabelPair* getKnobLabelPair(CControl* control)
         {
-            return std::find(knobs.begin(), knobs.end(), control) != knobs.end();
+            KnobLabelPair* returnValue = nullptr;
+
+            for (KnobLabelPair* pair : knobLabelPairs)
+            {
+                if (pair->knob == control)
+                {
+                    returnValue = pair;
+                    break;
+                }
+            }
+
+            return returnValue;
         }
 
         /** called once per child view of the container that owns the sub-controller this is where we grab and store the
@@ -201,60 +229,64 @@ namespace VSTGUI
         */
         CView* verifyView(CView* view, const UIAttributes& attributes, const IUIDescription* description) override
         {
-            auto* knob = dynamic_cast<CAnimKnob*>(view);
+            auto* container = dynamic_cast<CViewContainer*>(view);
 
             // --- push back knob onto list
-            if (knob)
+            if (container)
             {
-                const auto tooltipText = getTooltipText(knob->getValueNormalized(), PRECISION_2_DP);
-                knob->setTooltipText(tooltipText.c_str());
-                knobs.push_back(knob);
+                auto* knobLabelPair = new KnobLabelPair();
+                knobLabelPair->knob = nullptr;
+                knobLabelPair->text = nullptr;
+
+                container->forEachChild([&] (CView* view)
+                {
+                    auto* knob = dynamic_cast<CAnimKnob*>(view);
+                    if (knob)
+                    {
+                        knobLabelPair->knob = knob;
+                    }
+                    
+                    auto* text = dynamic_cast<CTextEdit*>(view);
+                    if (text)
+                    {
+                        knobLabelPair->text = text;
+                    }
+                });
+
+                if (knobLabelPair->knob && knobLabelPair->text)
+                {
+                    knobLabelPair->knob->setTooltipText(knobLabelPair->text->getText());
+                    knobLabelPairs.push_back(knobLabelPair);
+                }
+                else
+                {
+                    delete knobLabelPair;
+                }
             }
 
             return view;
         }
 
-        static std::string getTooltipText(const float value, const int precision)
-        {
-            // Create an output string stream
-            std::ostringstream stream;
-            // Set Fixed-Point Notation
-            stream << std::fixed;
-            // Set precision to 2 digits
-            stream << std::setprecision(precision);
-            //Add float to stream
-            stream << value;
-            // Get string from output string stream
-            return stream.str();
-        }
-
-        /** called when any control  in the view container changes; we only care about the link button and the knobs, we ignore the others
+        /** called when any control in the view container changes; we only care about the link button and the knobs, we ignore the others
 	    view objects that we want to link
 	    \param control - the control whose value changed
 	    */
         void valueChanged(CControl* control) override
         {
+            const auto knobLabelPair = getKnobLabelPair(control);
             // --- make sure this is not a rogue control
-            if (isManagedControl(control))
+            if (knobLabelPair)
             {
-                // --- iterate list
-                for (auto knob : knobs)
-                {
-                    // --- set the tooltip text for the knobs generating this message
-                    if (knob && control == knob)
-                    {
-                        // --- set the control visually
-                        const auto tooltipText = getTooltipText(knob->getValueNormalized(), PRECISION_2_DP);
-                        knob->setTooltipText(tooltipText.c_str());
+                auto knob = knobLabelPair->knob;
+                const auto text = knobLabelPair->text;
 
-                        // --- do the value change at parent level, to set on plugin
-                        parentController->valueChanged(knob);
+                // --- do the value change at parent level, to set on plugin
+                // Vital that this is done before setting the tooltip text, as it will update the CTextEdit object's text attribute
+                parentController->valueChanged(knob);
+                knob->setTooltipText(text->getText());
 
-                        knob->invalid();
-
-                        break;
-                    }
-                }
+                // Force re-paint
+                knob->invalid();
             }
             // --- do the value change at parent level, to set on plugin
             parentController->valueChanged(control);
@@ -307,11 +339,7 @@ namespace VSTGUI
         IController* parentController = nullptr; ///< pointer to owning listener
 
         // All managed knobs, which will update their tooltip text when their value changes
-        typedef std::vector<CAnimKnob*> KnobList;
-        KnobList knobs;
-
-    private:
-        // Default to 2 d.p. for Tooltip texts
-        const int PRECISION_2_DP = 2;
+        typedef std::vector<KnobLabelPair*> KnobList;
+        KnobList knobLabelPairs;
     };
 }
