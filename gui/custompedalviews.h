@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <sstream>
 
-#include "utilities.h"
+#include "../dsp/utilities.h"
 #include "vstgui/vstgui.h"
 #include "vstgui/vstgui_uidescription.h" // for IController
 
