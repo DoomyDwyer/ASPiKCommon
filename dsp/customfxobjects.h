@@ -48,8 +48,24 @@ struct AutoQEnvelopeFollowerParameters
         return *this;
     }
 
-    // Suppress generation of move constructor and move assignment operator
-    AutoQEnvelopeFollowerParameters(const AutoQEnvelopeFollowerParameters&&) = delete;
+    // Explicitly define move constructor
+    AutoQEnvelopeFollowerParameters(const AutoQEnvelopeFollowerParameters&& params) noexcept
+        : filterAlgorithm{params.filterAlgorithm},
+          fc{params.fc},
+          Q{params.Q},
+          filterOutputGain_dB{params.filterOutputGain_dB},
+          enableGainComp{params.enableGainComp},
+          matchAnalogNyquistLPF{params.matchAnalogNyquistLPF},
+          selfOscillate{params.selfOscillate},
+          enableNLP{params.enableNLP},
+          attackTime_mSec{params.attackTime_mSec},
+          releaseTime_mSec{params.releaseTime_mSec},
+          threshold_dB{params.threshold_dB},
+          sensitivity{params.sensitivity}
+    {
+    }
+
+    // Suppress generation of move assignment operator
     AutoQEnvelopeFollowerParameters& operator=(const AutoQEnvelopeFollowerParameters&&) = delete;
 
     // Filter parameters
