@@ -3,6 +3,9 @@
 #include "vstgui/vstgui.h"
 #include "vstgui/vstgui_uidescription.h" // for IController
 
+const float KNOB_FACTOR_DEFAULT = 1.0f;
+const float KNOB_FACTOR_GOES_TO_ELEVEN = 11.0f;
+
 namespace VSTGUI
 {
     /**
@@ -200,26 +203,6 @@ namespace VSTGUI
             knobLabelPairs.clear();
         }
 
-        /** test to see if control is in the list of controls
-        \param control - control to test
-        \return true if control is in list, false otherwise
-        */
-        KnobLabelPair* getKnobLabelPair(CControl* control)
-        {
-            KnobLabelPair* returnValue = nullptr;
-
-            for (KnobLabelPair* pair : knobLabelPairs)
-            {
-                if (pair->knob == control)
-                {
-                    returnValue = pair;
-                    break;
-                }
-            }
-
-            return returnValue;
-        }
-
         /** called once per child view of the container that owns the sub-controller this is where we grab and store the
             view objects that we want to manage
             \param view - the newly created view to use
@@ -273,7 +256,7 @@ namespace VSTGUI
 	    */
         void valueChanged(CControl* control) override
         {
-            const auto knobLabelPair = getKnobLabelPair(control);
+            const auto knobLabelPair = getKnob(control);
             // --- make sure this is not a rogue control
             if (knobLabelPair)
             {
@@ -341,5 +324,220 @@ namespace VSTGUI
         // All managed knobs, which will update their tooltip text when their value changes
         typedef std::vector<KnobLabelPair*> KnobList;
         KnobList knobLabelPairs;
+
+    private:
+        /** test to see if control is in the list of controls
+        \param control - control to test
+        \return true if control is in list, false otherwise
+        */
+        KnobLabelPair* getKnob(CControl* control)
+        {
+            KnobLabelPair* returnValue = nullptr;
+
+            for (KnobLabelPair* pair : knobLabelPairs)
+            {
+                if (pair->knob == control)
+                {
+                    returnValue = pair;
+                    break;
+                }
+            }
+
+            return returnValue;
+        }
+    };
+
+
+    /**
+    \class SimpleValueVariableToolTipKnobController
+    \ingroup Custom-SubControllers
+    \brief
+    In this object, you can add multiple knob controls so that moving a control moves updates the tooltip text to
+    display the knob's value.
+
+    -	Sub-Controller that manages some number of CAnimKnobs
+
+    -	use the sub-controller string "SimpleValueVariableToolTipKnobController" for the view container that holds the knobs;
+    there can only be one SimpleValueVariableToolTipKnobController for each view container
+
+    -	the verifyView( ) function gets called once per child view of the outer
+    container; this is where push the CAnimKnob controls onto our vector
+
+    -	the valueChanged( ) function gets called when *any* of the view containers sub
+    controls are moved; we only stash and control the CAnimKnobs so you can mix
+    other controls in the same view container that won't be affected
+
+    \author Steve Dwyer
+    \remark Based on the KnobLinkController by Will Pirkle http://www.willpirkle.com
+    \version Revision : 1.0
+    \date Date : 2010-12-28
+    */
+    class SimpleValueVariableToolTipKnobController : public IController
+    {
+    public:
+        /** SimpleValueVariableToolTipKnobController constructor
+        \param _parentController - pointer to the parent controller so we can forward messages to it
+        \param _multiplicationFactor - the factor by which to multiply the displayed value in the tooltip text (used e.g. for "Goes to Eleven" knobs)
+        */
+        SimpleValueVariableToolTipKnobController(IController* _parentController, float _multiplicationFactor)
+        {
+            // Store the multiplication factor, to display knob values with (used e.g. for "Goes to Eleven" knobs)
+            multiplicationFactor = _multiplicationFactor;
+            // --- save the parent listener
+            parentController = _parentController;
+        }
+
+        /** SimpleValueVariableToolTipKnobController constructor
+        \param _parentController - pointer to the parent controller so we can forward messages to it
+        */
+        SimpleValueVariableToolTipKnobController(IController* _parentController)
+        {
+            // Store the multiplication factor, to display knob values with (used e.g. for "Goes to Eleven" knobs)
+            multiplicationFactor = KNOB_FACTOR_DEFAULT;
+            // --- save the parent listener
+            parentController = _parentController;
+        }
+
+        ~SimpleValueVariableToolTipKnobController() override
+        {
+            knobs.clear();
+        }
+
+        /** called once per child view of the container that owns the sub-controller this is where we grab and store the
+            view objects that we want to manage
+            \param view - the newly created view to use
+            \param attributes - UIAttributes of control
+            \param description - IUIDescription of control
+            \return the verified view
+        */
+        CView* verifyView(CView* view, const UIAttributes& attributes, const IUIDescription* description) override
+        {
+            auto* knob = dynamic_cast<CAnimKnob*>(view);
+
+            // --- push back knob onto list
+            if (knob)
+            {
+                const auto tooltipText = getTooltipText(knob->getValueNormalized(), multiplicationFactor, PRECISION_2_DP);
+                knob->setTooltipText(tooltipText.c_str());
+                knobs.push_back(knob);
+            }
+
+            return view;
+        }
+
+        /** called when any control in the view container changes; we only care about the link button and the knobs, we ignore the others
+	    view objects that we want to link
+	    \param control - the control whose value changed
+	    */
+        void valueChanged(CControl* control) override
+        {
+            const auto knob = getKnob(control);
+            // --- make sure this is not a rogue control
+            if (knob)
+            {
+                // --- do the value change at parent level, to set on plugin
+                // Vital that this is done before setting the tooltip text, as it will update the CTextEdit object's text attribute
+                parentController->valueChanged(knob);
+                const auto tooltipText = getTooltipText(knob->getValueNormalized(), multiplicationFactor, PRECISION_2_DP);
+                knob->setTooltipText(tooltipText.c_str());
+
+                // Force re-paint
+                knob->invalid();
+            }
+            // --- do the value change at parent level, to set on plugin
+            parentController->valueChanged(control);
+        }
+
+        /** called once per child view of the container - we simply forward the call to the parent listener
+        \param attributes - UIAttributes of control
+        \param description - IUIDescription of control
+        \return the verified view
+        */
+        CView* createView(const UIAttributes& attributes, const IUIDescription* description) override
+        {
+            return parentController->createView(attributes, description);
+        }
+
+        /** called when the user begins to edit a control (mouse click) - we simply forward the call to the parent listener
+        \param pControl - the control
+        */
+        void controlBeginEdit(CControl* pControl) override { parentController->controlBeginEdit(pControl); }
+
+        /** called when the user ends editing a control (mouse released) - we simply forward the call to the parent listener
+        \param pControl - the control
+        */
+        void controlEndEdit(CControl* pControl) override { parentController->controlEndEdit(pControl); }
+
+        /** register the control update receiver objects that
+            allow us to ultimately bind GUI controls to plugin variables (thread-safe of course)
+        \param pControl - the control
+        */
+        void controlTagWillChange(CControl* pControl) override
+        {
+            pControl->setListener(parentController);
+            parentController->controlTagWillChange(pControl);
+            pControl->setListener(this);
+        }
+
+        /** register the control update receiver objects that
+        allow us to ultimately bind GUI controls to plugin variables (thread-safe of course)
+        \param pControl - the control
+        */
+        void controlTagDidChange(CControl* pControl) override
+        {
+            pControl->setListener(parentController);
+            parentController->controlTagDidChange(pControl);
+            pControl->setListener(this);
+        }
+
+    protected:
+        // --- the parent controller; we can issue IController commands to it!
+        IController* parentController = nullptr; ///< pointer to owning listener
+
+        // All managed knobs, which will update their tooltip text when their value changes
+        typedef std::vector<CAnimKnob*> KnobList;
+        KnobList knobs;
+
+    private:
+        // Default to 2 d.p. for Tooltip texts
+        const int PRECISION_2_DP = 2;
+
+        // The multiplication factor, to display knob values with (used e.g. for "Goes to Eleven" knobs)
+        float multiplicationFactor;
+
+        static std::string getTooltipText(const float value, const float multiplicationFactor, const int precision)
+        {
+            // Create an output string stream
+            std::ostringstream stream;
+            // Set Fixed-Point Notation
+            stream << std::fixed;
+            // Set precision to 2 digits
+            stream << std::setprecision(precision);
+            //Add float to stream
+            stream << value * multiplicationFactor;
+            // Get string from output string stream
+            return stream.str();
+        }
+
+
+        /** test to see if control is in the list of controls
+        \param control - control to test
+        \return true if control is in list, false otherwise
+        */
+        CAnimKnob* getKnob(CControl* control)
+        {
+            CAnimKnob* returnValue = nullptr;
+
+            for (CAnimKnob* knob : knobs)
+            {
+                if (knob == control)
+                {
+                    returnValue = knob;
+                    break;
+                }
+            }
+
+            return returnValue;
+        }
     };
 }
