@@ -1,6 +1,39 @@
 #pragma once
 #include "fxobjects.h"
-#include "utilities.h"
+#include "../utils/observable.h"
+#include "../utils/utilities.h"
+
+
+class BooleanStateChangeManager: public Observable
+{
+public:
+    BooleanStateChangeManager(); /* C-TOR */
+    ~BooleanStateChangeManager() override; /* D-TOR */
+
+    // Suppress generation of copy constructor and copy assignment operator
+    BooleanStateChangeManager(const BooleanStateChangeManager&) = delete;
+    BooleanStateChangeManager& operator=(const BooleanStateChangeManager&) = delete;
+
+    // Suppress generation of move constructor and move assignment operator
+    BooleanStateChangeManager(const BooleanStateChangeManager&&) = delete;
+    BooleanStateChangeManager& operator=(const BooleanStateChangeManager&&) = delete;
+
+    /** Query the current state maintained by this object */
+    /**
+    \return bool the current state maintained by this object
+    */
+    virtual bool getState();
+
+    /** Set the current state maintained by this object */
+    /**
+    \param _state the current state maintained by this object
+    */
+    virtual void setState(bool _state);
+
+private:
+    bool state;
+    bool previousState = false;
+};
 
 /**
 \struct AutoQEnvelopeFollowerParameters
@@ -142,12 +175,22 @@ public:
     */
     double processAudioSample(double xn) override;
 
+    /** Allows plugins access to an EnvelopeFollower's ThresholdStateChangeManager object */
+    /**
+    \return BooleanStateChangeManager* a reference to the EnvelopeFollower's ThresholdStateChangeManager object
+    */
+    virtual BooleanStateChangeManager* getThresholdStateChangeManager();
+
 protected:
     AutoQEnvelopeFollowerParameters parameters; ///< object parameters
 
     // --- 1 filter and 1 detector
     ZVAFilter filter; ///< filter to modulate
     AudioDetector detector; ///< detector to track input signal
+
+    // This Observable object's state is updated to indicate whether the value detected by the EnvelopeDetector (AudioDetector)
+    // has exceeded te configurable threshold
+    BooleanStateChangeManager thresholdStateChangeManager;
 
 private:
     virtual bool filterParametersUpdated(ZVAFilterParameters filterParams,

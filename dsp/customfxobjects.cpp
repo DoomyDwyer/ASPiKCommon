@@ -1,6 +1,30 @@
 #include "customfxobjects.h"
 
-#include "utilities.h"
+#include "../utils/utilities.h"
+
+
+BooleanStateChangeManager::BooleanStateChangeManager()
+{
+    state = false;
+}/* C-TOR */
+
+BooleanStateChangeManager::~BooleanStateChangeManager() = default; /* D-TOR */
+
+bool BooleanStateChangeManager::getState()
+{
+    return state;
+}
+
+void BooleanStateChangeManager::setState(bool _state)
+{
+    state = _state;
+
+    if (state != previousState)
+    {
+        notify(this);
+        previousState = state;
+    }
+}
 
 AutoQEnvelopeFollower::AutoQEnvelopeFollower()
 {
@@ -60,8 +84,11 @@ double AutoQEnvelopeFollower::processAudioSample(double xn)
     filterParams.fc = parameters.fc;
     filterParams.Q = parameters.Q;
 
+    bool thresholdExceeded = deltaValue > 0.0;
+    thresholdStateChangeManager.setState(thresholdExceeded);
+
     // --- if above the threshold, modulate the filter fc
-    if (deltaValue > 0.0) // || delta_dB > 0.0)
+    if (thresholdExceeded) // || delta_dB > 0.0)
     {
         // --- fc Computer
         // --- best results are with linear values when detector is in dB mode
@@ -76,6 +103,11 @@ double AutoQEnvelopeFollower::processAudioSample(double xn)
 
     // --- perform the filtering operation
     return filter.processAudioSample(xn);
+}
+
+BooleanStateChangeManager* AutoQEnvelopeFollower::getThresholdStateChangeManager()
+{
+    return &thresholdStateChangeManager;
 }
 
 bool AutoQEnvelopeFollower::filterParametersUpdated(const ZVAFilterParameters filterParams,

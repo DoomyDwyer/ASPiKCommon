@@ -1,5 +1,5 @@
 #pragma once
-#include "../dsp/utilities.h"
+#include "../utils/utilities.h"
 #include "vstgui/vstgui.h"
 #include "vstgui/vstgui_uidescription.h" // for IController
 
