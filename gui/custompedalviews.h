@@ -75,7 +75,7 @@ namespace VSTGUI
                 // On Mouse Down *only*, hence when control's value normalized = 1
                 if (isEqual(control->getValueNormalized(), 1.0f))
                 {
-                    // --- set the control visually and flip it's value (arithmetic negate)
+                    // --- set the control visually and flip its value (boolean negate using arithmetic)
                     indicator->setValueNormalized(indicator->getValueNormalized() * -1 + 1);
 
                     // --- do the value change at parent level, to set on plugin
