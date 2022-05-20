@@ -1,5 +1,6 @@
 #pragma once
 #include "fxobjects.h"
+#include "../utils/observer.h"
 #include "../utils/observable.h"
 #include "../utils/utilities.h"
 
@@ -469,10 +470,21 @@ public:
     */
     void setParameters(const DelayGainCalculatorParameters& _parameters);
 
+    /** Allows plugins access to an DelayGainCalculator's ThresholdStateChangeManager object */
+    /**
+    \return BooleanStateChangeManager* a reference to the DelayGainCalculator's ThresholdStateChangeManager object
+    */
+    BooleanStateChangeManager* getThresholdStateChangeManager();
+
 private:
     DelayGainCalculatorParameters parameters;
 
     void updateSettings(const DelayGainCalculatorParameters& _parameters);
+
+    
+    // This Observable object's state is updated to indicate whether the value detected by the EnvelopeDetector (AudioDetector)
+    // has exceeded te configurable threshold
+    BooleanStateChangeManager thresholdStateChangeManager;
 
     double threshValue = 0.0;
     double wetGainMin = 0.0;
@@ -740,7 +752,7 @@ Control I/F:
 \date Date : 2021 / 12 / 11
 */
 template <class SideChainProcessorParams>
-class EnvelopeDetectorSideChainSignalProcessor : public SideChainSignalProcessor<SideChainProcessorParams>
+class EnvelopeDetectorSideChainSignalProcessor : public SideChainSignalProcessor<SideChainProcessorParams>, Observer
 {
 public:
     EnvelopeDetectorSideChainSignalProcessor<SideChainProcessorParams>()
@@ -761,6 +773,8 @@ public:
         delayGainCalculatorParams.wetGainMin_dB = 0.0;
         delayGainCalculatorParams.wetGainMax_dB = 0.0;
         delayGainCalculator.setParameters(delayGainCalculatorParams);
+
+        registerDelayGainCalculatorObservers();
     } /* C-TOR */
 
     ~EnvelopeDetectorSideChainSignalProcessor<SideChainProcessorParams>() override = default; /* D-TOR */
@@ -848,13 +862,45 @@ public:
         parameters = _parameters;
     }
 
+    /** Allows plugins access to an SideChainSignalProcessor's ThresholdStateChangeManager object */
+    /**
+    \return BooleanStateChangeManager* a reference to the SideChainSignalProcessor's ThresholdStateChangeManager object
+    */
+    BooleanStateChangeManager* getThresholdStateChangeManager()
+    {
+        return &thresholdStateChangeManager;
+    }
+
 private:
     EnvelopeDetectorSideChainSignalProcessorParameters parameters;
 
     AudioDetector envDetector; ///< detector to track input signal
     DelayGainCalculator delayGainCalculator; // Calculate gain to wet signal based on detected envelope
 
+    // This Observable object's state is updated to indicate whether the value detected by the EnvelopeDetector (AudioDetector)
+    // has exceeded te configurable threshold
+    BooleanStateChangeManager thresholdStateChangeManager;
+
     double sideChainGain = 0.0;
+
+    bool thresholdExceeded;
+
+    void update(Observable* observable) override
+    {
+        auto* subject = dynamic_cast<BooleanStateChangeManager*>(observable);
+
+        // --- push back knob onto list
+        if (subject)
+        {
+            thresholdExceeded = subject->getState() ? 1 : 0;
+            thresholdStateChangeManager.setState(thresholdExceeded);
+        }
+    }
+    
+    void registerDelayGainCalculatorObservers()
+    {
+        delayGainCalculator.getThresholdStateChangeManager()->attach(this);
+    }
 
     static bool detectorParametersUpdated(AudioDetectorParameters adParams, const SideChainProcessorParams& params)
     {

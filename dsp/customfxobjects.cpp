@@ -313,12 +313,16 @@ double DelayGainCalculator::processAudioSample(double xn)
     // If above the threshold, side chain output is always equal to wetGainMin
     double yn = wetGainMin;
 
+    bool thresholdExceeded = true;
+
     if (xn < threshValue)
     {
+        thresholdExceeded = false;
         // If below the threshold,
         // do unipolar modulation to determine side chain output, up to a maximum value of wetGainMax
         yn  = doUnipolarModulationFromMin(parameters.sensitivity * (threshValue - xn), wetGainMin, wetGainMax);
     }
+    thresholdStateChangeManager.setState(thresholdExceeded);
 
     return yn;
 }
@@ -341,6 +345,11 @@ void DelayGainCalculator::setParameters(const DelayGainCalculatorParameters& _pa
 
     // --- save
     parameters = _parameters;
+}
+
+BooleanStateChangeManager* DelayGainCalculator::getThresholdStateChangeManager()
+{
+    return &thresholdStateChangeManager;
 }
 
 AnalogTone::AnalogTone() = default;
