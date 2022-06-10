@@ -84,7 +84,7 @@ double AutoQEnvelopeFollower::processAudioSample(double xn)
     filterParams.fc = parameters.fc;
     filterParams.Q = parameters.Q;
 
-    bool thresholdExceeded = deltaValue > 0.0;
+    const bool thresholdExceeded = deltaValue > 0.0;
     thresholdStateChangeManager.setState(thresholdExceeded);
 
     // --- if above the threshold, modulate the filter fc
@@ -350,6 +350,92 @@ void DelayGainCalculator::setParameters(const DelayGainCalculatorParameters& _pa
 BooleanStateChangeManager* DelayGainCalculator::getThresholdStateChangeManager()
 {
     return &thresholdStateChangeManager;
+}
+
+Vibrato::Vibrato() = default;
+
+Vibrato::~Vibrato() = default;
+
+bool Vibrato::reset(double _sampleRate)
+{
+	// --- create new buffer, 100mSec long
+	stereoDelay.reset(_sampleRate);
+	stereoDelay.createDelayBuffers(_sampleRate, 100.0);
+
+	// --- lfo
+	lfo.reset(_sampleRate);
+	OscillatorParameters params = lfo.getParameters();
+	params.waveform = generatorWaveform::kSin;
+	lfo.setParameters(params);
+
+	return true;
+}
+
+double Vibrato::processAudioSample(double xn)
+{
+	auto input = static_cast<float>(xn);
+	float output = 0.0;
+	processAudioFrame(&input, &output, 1, 1);
+	return output;
+}
+
+bool Vibrato::canProcessAudioFrame() { return true; }
+
+bool Vibrato::processAudioFrame(const float* inputFrame,		/* ptr to one frame of data: pInputFrame[0] = left, pInputFrame[1] = right, etc...*/
+	float* outputFrame,
+	uint32_t inputChannels,
+	uint32_t outputChannels)
+{
+	// --- make sure we have input and outputs
+	if (inputChannels == 0 || outputChannels == 0)
+		return false;
+
+	// --- render LFO
+	const SignalGenData lfoOutput = lfo.renderAudioOutput();
+
+	// --- setup delay modulation
+	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> params = stereoDelay.getParameters();
+
+    // Mix == 1.0 and Level_dB == 0.0 means the mix will contain the wet signal *only*
+    // (Equivalent to Wet Level being at 0.0 dB and Dry Level being at -96.0 dB)
+	params.mix = 1.0;
+	params.Level_dB = 0.0;
+	params.feedback_Pct = 0.0;
+
+	// --- calc modulated delay times
+	const double depth = parameters.lfoDepth_Pct / 100.0;
+
+	params.leftDelay_mSec = doBipolarModulation(depth * lfoOutput.normalOutput, modulationMin, modulationMax);
+
+	// --- set right delay to match
+	params.rightDelay_mSec = params.leftDelay_mSec;
+
+	// --- modulate the delay
+	stereoDelay.setParameters(params);
+
+	// --- just call the function and pass our info in/out
+	return stereoDelay.processAudioFrame(inputFrame, outputFrame, inputChannels, outputChannels);
+}
+
+ModulatedDelayParameters Vibrato::getParameters() const { return parameters; }
+
+void Vibrato::setParameters(ModulatedDelayParameters _parameters)
+{
+	// --- bulk copy
+	parameters = _parameters;
+
+	OscillatorParameters lfoParams = lfo.getParameters();
+	lfoParams.frequency_Hz = parameters.lfoRate_Hz;
+	if (parameters.algorithm == modDelaylgorithm::kVibrato)
+		lfoParams.waveform = generatorWaveform::kSin;
+	else
+		lfoParams.waveform = generatorWaveform::kTriangle;
+
+	lfo.setParameters(lfoParams);
+
+	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> adParams = stereoDelay.getParameters();
+	adParams.feedback_Pct = parameters.feedback_Pct;
+	stereoDelay.setParameters(adParams);
 }
 
 AnalogTone::AnalogTone() = default;
