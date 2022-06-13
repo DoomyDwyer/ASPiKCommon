@@ -352,11 +352,11 @@ BooleanStateChangeManager* DelayGainCalculator::getThresholdStateChangeManager()
     return &thresholdStateChangeManager;
 }
 
-Vibrato::Vibrato() = default;
+SimpleVibrato::SimpleVibrato() = default;
 
-Vibrato::~Vibrato() = default;
+SimpleVibrato::~SimpleVibrato() = default;
 
-bool Vibrato::reset(double _sampleRate)
+bool SimpleVibrato::reset(double _sampleRate)
 {
 	// --- create new buffer, 100mSec long
 	stereoDelay.reset(_sampleRate);
@@ -371,7 +371,7 @@ bool Vibrato::reset(double _sampleRate)
 	return true;
 }
 
-double Vibrato::processAudioSample(double xn)
+double SimpleVibrato::processAudioSample(double xn)
 {
 	auto input = static_cast<float>(xn);
 	float output = 0.0;
@@ -379,9 +379,9 @@ double Vibrato::processAudioSample(double xn)
 	return output;
 }
 
-bool Vibrato::canProcessAudioFrame() { return true; }
+bool SimpleVibrato::canProcessAudioFrame() { return true; }
 
-bool Vibrato::processAudioFrame(const float* inputFrame,		/* ptr to one frame of data: pInputFrame[0] = left, pInputFrame[1] = right, etc...*/
+bool SimpleVibrato::processAudioFrame(const float* inputFrame,		/* ptr to one frame of data: pInputFrame[0] = left, pInputFrame[1] = right, etc...*/
 	float* outputFrame,
 	uint32_t inputChannels,
 	uint32_t outputChannels)
@@ -417,25 +417,104 @@ bool Vibrato::processAudioFrame(const float* inputFrame,		/* ptr to one frame of
 	return stereoDelay.processAudioFrame(inputFrame, outputFrame, inputChannels, outputChannels);
 }
 
-ModulatedDelayParameters Vibrato::getParameters() const { return parameters; }
+ModulatedDelayParameters SimpleVibrato::getParameters() const { return parameters; }
 
-void Vibrato::setParameters(ModulatedDelayParameters _parameters)
+void SimpleVibrato::setParameters(ModulatedDelayParameters _parameters)
 {
 	// --- bulk copy
 	parameters = _parameters;
 
 	OscillatorParameters lfoParams = lfo.getParameters();
 	lfoParams.frequency_Hz = parameters.lfoRate_Hz;
-	if (parameters.algorithm == modDelaylgorithm::kVibrato)
-		lfoParams.waveform = generatorWaveform::kSin;
-	else
-		lfoParams.waveform = generatorWaveform::kTriangle;
+	lfoParams.waveform = generatorWaveform::kSin;
 
 	lfo.setParameters(lfoParams);
 
-	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> adParams = stereoDelay.getParameters();
-	adParams.feedback_Pct = parameters.feedback_Pct;
-	stereoDelay.setParameters(adParams);
+	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> delayParameters = stereoDelay.getParameters();
+	delayParameters.feedback_Pct = parameters.feedback_Pct;
+	stereoDelay.setParameters(delayParameters);
+}
+
+SimpleFlanger::SimpleFlanger() = default;
+
+SimpleFlanger::~SimpleFlanger() = default;
+
+bool SimpleFlanger::reset(double _sampleRate)
+{
+	// --- create new buffer, 100mSec long
+	stereoDelay.reset(_sampleRate);
+	stereoDelay.createDelayBuffers(_sampleRate, 100.0);
+
+	// --- lfo
+	lfo.reset(_sampleRate);
+	OscillatorParameters params = lfo.getParameters();
+	params.waveform = generatorWaveform::kTriangle;
+	lfo.setParameters(params);
+
+	return true;
+}
+
+double SimpleFlanger::processAudioSample(double xn)
+{
+	auto input = static_cast<float>(xn);
+	float output = 0.0;
+	processAudioFrame(&input, &output, 1, 1);
+	return output;
+}
+
+bool SimpleFlanger::canProcessAudioFrame() { return true; }
+
+bool SimpleFlanger::processAudioFrame(const float* inputFrame,		/* ptr to one frame of data: pInputFrame[0] = left, pInputFrame[1] = right, etc...*/
+	float* outputFrame,
+	uint32_t inputChannels,
+	uint32_t outputChannels)
+{
+	// --- make sure we have input and outputs
+	if (inputChannels == 0 || outputChannels == 0)
+		return false;
+
+	// --- render LFO
+	const SignalGenData lfoOutput = lfo.renderAudioOutput();
+
+	// --- setup delay modulation
+	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> params = stereoDelay.getParameters();
+
+    // Mix == 0.5 and Level_dB == 0.0 means the mix will contain an equal mix of the wet & dry signals
+    // (Equivalent to Wet Level plus Dry Level being at Unity Gain [0.0 dB])
+	params.mix = 0.5;
+	params.Level_dB = -0.0;
+    
+	// --- calc modulated delay times
+	const double depth = parameters.lfoDepth_Pct / 100.0;
+
+	params.leftDelay_mSec = doUnipolarModulationFromMin(bipolarToUnipolar(depth * lfoOutput.normalOutput), modulationMin, modulationMax);
+
+	// --- set right delay to match
+	params.rightDelay_mSec = params.leftDelay_mSec;
+
+	// --- modulate the delay
+	stereoDelay.setParameters(params);
+
+	// --- just call the function and pass our info in/out
+	return stereoDelay.processAudioFrame(inputFrame, outputFrame, inputChannels, outputChannels);
+}
+
+ModulatedDelayParameters SimpleFlanger::getParameters() const { return parameters; }
+
+void SimpleFlanger::setParameters(ModulatedDelayParameters _parameters)
+{
+	// --- bulk copy
+	parameters = _parameters;
+
+	OscillatorParameters lfoParams = lfo.getParameters();
+	lfoParams.frequency_Hz = parameters.lfoRate_Hz;
+	lfoParams.waveform = generatorWaveform::kTriangle;
+
+	lfo.setParameters(lfoParams);
+
+	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> delayParameters = stereoDelay.getParameters();
+	delayParameters.feedback_Pct = parameters.feedback_Pct;
+	stereoDelay.setParameters(delayParameters);
 }
 
 AnalogTone::AnalogTone() = default;
