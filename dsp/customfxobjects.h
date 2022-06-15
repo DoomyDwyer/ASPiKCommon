@@ -1400,8 +1400,8 @@ public:
 
 private:
 	ModulatedDelayParameters parameters; ///< object parameters
-	//AudioDelay delay;	///< the delay to modulate
     DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters> sideChainSignalProcessor;
+    // the delay to modulate
     DigitalDelay<DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters>, DefaultSideChainSignalProcessorParameters> stereoDelay{sideChainSignalProcessor};
 	LFO lfo;			///< the modulator
 
@@ -1475,13 +1475,88 @@ public:
 
 private:
 	ModulatedDelayParameters parameters; ///< object parameters
-	//AudioDelay delay;	///< the delay to modulate
     DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters> sideChainSignalProcessor;
+    // the delay to modulate
     DigitalDelay<DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters>, DefaultSideChainSignalProcessorParameters> stereoDelay{sideChainSignalProcessor};
 	LFO lfo;			///< the modulator
 
 	const double minDelay_mSec = 1.0;
 	const double maxDepth_mSec = 7.0;
+	const double modulationMin = minDelay_mSec;
+	const double modulationMax = minDelay_mSec + maxDepth_mSec;
+};
+
+/**
+\class SimpleChorus
+\ingroup CustomFX-Objects
+\brief
+The SimpleChorus object implements the Chorus as a Modulated Delay algorithm.
+
+Audio I / O :
+	-Processes mono input to mono OR stereo output.
+
+Control I / F :
+	-Use ModulatedDelayParameters structure to get / set object params.
+
+\author Steve Dwyer - Adapted from Will Pirkle http://www.willpirkle.com
+\remark This object is based on the AudioDelay class included in Designing Audio Effects Plugins in C++ 2nd Ed. by Will Pirkle
+\version Revision : 1.0
+\date Date : 2022 / 06 / 09
+*/
+class SimpleChorus final : public IAudioSignalProcessor
+{
+public:
+	SimpleChorus(); /* C-TOR */
+	virtual ~SimpleChorus(); /* D-TOR */
+
+    // Suppress generation of copy constructor and copy assignment operator
+    SimpleChorus(const SimpleChorus&) = delete;
+    SimpleChorus& operator=(const SimpleChorus&) = delete;
+
+    // Suppress generation of move constructor and move assignment operator
+    SimpleChorus(const SimpleChorus&&) = delete;
+    SimpleChorus& operator=(const SimpleChorus&&) = delete;
+
+	/** reset members to initialized state */
+	bool reset(double _sampleRate) override;
+
+	/** process input sample */
+	/**
+	\param xn input
+	\return the processed sample
+	*/
+	double processAudioSample(double xn) override;
+
+	/** return true: this object can process frames */
+	bool canProcessAudioFrame() override;
+
+	/** process STEREO audio delay of frames */
+	bool processAudioFrame(const float* inputFrame,		/* ptr to one frame of data: pInputFrame[0] = left, pInputFrame[1] = right, etc...*/
+		float* outputFrame,
+		uint32_t inputChannels,
+		uint32_t outputChannels) override;
+
+	/** get parameters: note use of custom structure for passing param data */
+	/**
+	\return ModulatedDelayParameters custom data structure
+	*/
+	 ModulatedDelayParameters getParameters() const;
+
+	/** set parameters: note use of custom structure for passing param data */
+	/**
+	\param _parameters custom data structure
+	*/
+	void setParameters(ModulatedDelayParameters _parameters);
+
+private:
+	ModulatedDelayParameters parameters; ///< object parameters
+    DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters> sideChainSignalProcessor;
+    // the delay to modulate
+    DigitalDelay<DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters>, DefaultSideChainSignalProcessorParameters> stereoDelay{sideChainSignalProcessor};
+	LFO lfo;			///< the modulator
+
+	const double minDelay_mSec = 10.0;
+	const double maxDepth_mSec = 30.0;
 	const double modulationMin = minDelay_mSec;
 	const double modulationMax = minDelay_mSec + maxDepth_mSec;
 };

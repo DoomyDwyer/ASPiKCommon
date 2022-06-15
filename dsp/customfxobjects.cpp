@@ -517,6 +517,88 @@ void SimpleFlanger::setParameters(ModulatedDelayParameters _parameters)
 	stereoDelay.setParameters(delayParameters);
 }
 
+SimpleChorus::SimpleChorus() = default;
+
+SimpleChorus::~SimpleChorus() = default;
+
+bool SimpleChorus::reset(double _sampleRate)
+{
+	// --- create new buffer, 100mSec long
+	stereoDelay.reset(_sampleRate);
+	stereoDelay.createDelayBuffers(_sampleRate, 100.0);
+
+	// --- lfo
+	lfo.reset(_sampleRate);
+	OscillatorParameters params = lfo.getParameters();
+	params.waveform = generatorWaveform::kTriangle;
+	lfo.setParameters(params);
+
+	return true;
+}
+
+double SimpleChorus::processAudioSample(double xn)
+{
+	auto input = static_cast<float>(xn);
+	float output = 0.0;
+	processAudioFrame(&input, &output, 1, 1);
+	return output;
+}
+
+bool SimpleChorus::canProcessAudioFrame() { return true; }
+
+bool SimpleChorus::processAudioFrame(const float* inputFrame,		/* ptr to one frame of data: pInputFrame[0] = left, pInputFrame[1] = right, etc...*/
+	float* outputFrame,
+	uint32_t inputChannels,
+	uint32_t outputChannels)
+{
+	// --- make sure we have input and outputs
+	if (inputChannels == 0 || outputChannels == 0)
+		return false;
+
+	// --- render LFO
+	const SignalGenData lfoOutput = lfo.renderAudioOutput();
+
+	// --- setup delay modulation
+	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> params = stereoDelay.getParameters();
+
+    // Mix == 0.2920542156 and Level_dB == 0.0 is the equivalent to Wet Level plus Dry Level being at Unity Gain [0.0 dB]
+    // and the wet mix being at approx -3.0 dB
+	params.mix = 0.2920542156;
+	params.Level_dB = -0.0;
+    
+	// --- calc modulated delay times
+	const double depth = parameters.lfoDepth_Pct / 100.0;
+
+	params.leftDelay_mSec = doBipolarModulation(depth * lfoOutput.normalOutput, modulationMin, modulationMax);
+
+	// --- set right delay to match
+	params.rightDelay_mSec = params.leftDelay_mSec;
+
+	// --- modulate the delay
+	stereoDelay.setParameters(params);
+
+	// --- just call the function and pass our info in/out
+	return stereoDelay.processAudioFrame(inputFrame, outputFrame, inputChannels, outputChannels);
+}
+
+ModulatedDelayParameters SimpleChorus::getParameters() const { return parameters; }
+
+void SimpleChorus::setParameters(ModulatedDelayParameters _parameters)
+{
+	// --- bulk copy
+	parameters = _parameters;
+
+	OscillatorParameters lfoParams = lfo.getParameters();
+	lfoParams.frequency_Hz = parameters.lfoRate_Hz;
+	lfoParams.waveform = generatorWaveform::kTriangle;
+
+	lfo.setParameters(lfoParams);
+
+	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> delayParameters = stereoDelay.getParameters();
+	delayParameters.feedback_Pct = parameters.feedback_Pct;
+	stereoDelay.setParameters(delayParameters);
+}
+
 AnalogTone::AnalogTone() = default;
 
 AnalogTone::~AnalogTone() = default;
