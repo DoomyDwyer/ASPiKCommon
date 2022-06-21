@@ -1337,6 +1337,77 @@ private:
 };
 
 /**
+\enum timeModulatedDelayAlgorithm
+\ingroup Constants-Enums
+\brief
+Use this strongly typed enum to easily set modulated delay algorithm.
+
+- enum class timeModulatedDelayAlgorithm { kFlanger, kChorus, kVibrato };
+
+\author Steve Dwyer - Adapted from Will Pirkle http://www.willpirkle.com
+\remark This object is based on the modDelayAlgorithm enum included in Designing Audio Effects Plugins in C++ 2nd Ed. by Will Pirkle
+\version Revision : 1.0
+\date Date : 2022 / 06 / 18
+*/
+enum class timeModulatedDelayAlgorithm { kFlanger, kChorus, kVibrato };
+
+
+/**
+\struct TimeModulatedDelayParameters
+\ingroup FX-Objects
+\brief
+Custom parameter structure for the ModulatedDelay object.
+
+\author Steve Dwyer - Adapted from Will Pirkle http://www.willpirkle.com
+\remark This object is based on the TimeModulatedDelayParameters class included in Designing Audio Effects Plugins in C++ 2nd Ed. by Will Pirkle
+\version Revision : 1.0
+\date Date : 2022 / 06 / 18
+*/
+struct TimeModulatedDelayParameters
+{
+    TimeModulatedDelayParameters() = default;
+    ~TimeModulatedDelayParameters() = default;
+
+    // Explicitly use default copy constructor
+    TimeModulatedDelayParameters(const TimeModulatedDelayParameters&) = default;
+
+    // Copy assignment operator
+	/** all FXObjects parameter objects require overloaded= operator so remember to add new entries if you add new variables. */
+	TimeModulatedDelayParameters& operator=(const TimeModulatedDelayParameters& params)	// need this override for collections to work
+	{
+		if (this == &params)
+			return *this;
+
+		algorithm = params.algorithm;
+		lfoRate_Hz = params.lfoRate_Hz;
+		lfoDepth_Pct = params.lfoDepth_Pct;
+		feedback_Pct = params.feedback_Pct;
+        mix = params.mix;
+		return *this;
+	}
+
+    // Move constructor
+    TimeModulatedDelayParameters(TimeModulatedDelayParameters&& params) noexcept
+        : algorithm{params.algorithm},
+          lfoRate_Hz{params.lfoRate_Hz},
+          lfoDepth_Pct{params.lfoDepth_Pct},
+          feedback_Pct{params.feedback_Pct},
+          mix{params.mix}
+    {
+    }
+
+    // Suppress generation of move assignment operator
+    TimeModulatedDelayParameters& operator=(TimeModulatedDelayParameters&&) = default;
+
+	// --- individual parameters
+	timeModulatedDelayAlgorithm algorithm = timeModulatedDelayAlgorithm::kFlanger; ///< mod delay algorithm
+	double lfoRate_Hz = 0.0;	///< mod delay LFO rate in Hz
+	double lfoDepth_Pct = 0.0;	///< mod delay LFO depth in %
+	double mix = 0.0;	///< mod delay LFO depth in %
+	double feedback_Pct = 0.0;	///< feedback in %
+};
+
+/**
 \class SimpleVibrato
 \ingroup CustomFX-Objects
 \brief
@@ -1346,7 +1417,7 @@ Audio I / O :
 	-Processes mono input to mono OR stereo output.
 
 Control I / F :
-	-Use ModulatedDelayParameters structure to get / set object params.
+	-Use TimeModulatedDelayParameters structure to get / set object params.
 
 \author Steve Dwyer - Adapted from Will Pirkle http://www.willpirkle.com
 \remark This object is based on the AudioDelay class included in Designing Audio Effects Plugins in C++ 2nd Ed. by Will Pirkle
@@ -1388,18 +1459,18 @@ public:
 
 	/** get parameters: note use of custom structure for passing param data */
 	/**
-	\return ModulatedDelayParameters custom data structure
+	\return TimeModulatedDelayParameters custom data structure
 	*/
-	 ModulatedDelayParameters getParameters() const;
+	 TimeModulatedDelayParameters getParameters() const;
 
 	/** set parameters: note use of custom structure for passing param data */
 	/**
 	\param _parameters custom data structure
 	*/
-	void setParameters(ModulatedDelayParameters _parameters);
+	void setParameters(TimeModulatedDelayParameters _parameters);
 
 private:
-	ModulatedDelayParameters parameters; ///< object parameters
+	TimeModulatedDelayParameters parameters; ///< object parameters
     DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters> sideChainSignalProcessor;
     // the delay to modulate
     DigitalDelay<DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters>, DefaultSideChainSignalProcessorParameters> stereoDelay{sideChainSignalProcessor};
@@ -1421,7 +1492,7 @@ Audio I / O :
 	-Processes mono input to mono OR stereo output.
 
 Control I / F :
-	-Use ModulatedDelayParameters structure to get / set object params.
+	-Use TimeModulatedDelayParameters structure to get / set object params.
 
 \author Steve Dwyer - Adapted from Will Pirkle http://www.willpirkle.com
 \remark This object is based on the AudioDelay class included in Designing Audio Effects Plugins in C++ 2nd Ed. by Will Pirkle
@@ -1463,18 +1534,18 @@ public:
 
 	/** get parameters: note use of custom structure for passing param data */
 	/**
-	\return ModulatedDelayParameters custom data structure
+	\return TimeModulatedDelayParameters custom data structure
 	*/
-	 ModulatedDelayParameters getParameters() const;
+	 TimeModulatedDelayParameters getParameters() const;
 
 	/** set parameters: note use of custom structure for passing param data */
 	/**
 	\param _parameters custom data structure
 	*/
-	void setParameters(ModulatedDelayParameters _parameters);
+	void setParameters(TimeModulatedDelayParameters _parameters);
 
 private:
-	ModulatedDelayParameters parameters; ///< object parameters
+	TimeModulatedDelayParameters parameters; ///< object parameters
     DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters> sideChainSignalProcessor;
     // the delay to modulate
     DigitalDelay<DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters>, DefaultSideChainSignalProcessorParameters> stereoDelay{sideChainSignalProcessor};
@@ -1496,7 +1567,7 @@ Audio I / O :
 	-Processes mono input to mono OR stereo output.
 
 Control I / F :
-	-Use ModulatedDelayParameters structure to get / set object params.
+	-Use TimeModulatedDelayParameters structure to get / set object params.
 
 \author Steve Dwyer - Adapted from Will Pirkle http://www.willpirkle.com
 \remark This object is based on the AudioDelay class included in Designing Audio Effects Plugins in C++ 2nd Ed. by Will Pirkle
@@ -1538,18 +1609,18 @@ public:
 
 	/** get parameters: note use of custom structure for passing param data */
 	/**
-	\return ModulatedDelayParameters custom data structure
+	\return TimeModulatedDelayParameters custom data structure
 	*/
-	 ModulatedDelayParameters getParameters() const;
+	 TimeModulatedDelayParameters getParameters() const;
 
 	/** set parameters: note use of custom structure for passing param data */
 	/**
 	\param _parameters custom data structure
 	*/
-	void setParameters(ModulatedDelayParameters _parameters);
+	void setParameters(TimeModulatedDelayParameters _parameters);
 
 private:
-	ModulatedDelayParameters parameters; ///< object parameters
+	TimeModulatedDelayParameters parameters; ///< object parameters
     DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters> sideChainSignalProcessor;
     // the delay to modulate
     DigitalDelay<DefaultSideChainSignalProcessor<DefaultSideChainSignalProcessorParameters>, DefaultSideChainSignalProcessorParameters> stereoDelay{sideChainSignalProcessor};

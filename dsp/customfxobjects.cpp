@@ -417,9 +417,9 @@ bool SimpleVibrato::processAudioFrame(const float* inputFrame,		/* ptr to one fr
 	return stereoDelay.processAudioFrame(inputFrame, outputFrame, inputChannels, outputChannels);
 }
 
-ModulatedDelayParameters SimpleVibrato::getParameters() const { return parameters; }
+TimeModulatedDelayParameters SimpleVibrato::getParameters() const { return parameters; }
 
-void SimpleVibrato::setParameters(ModulatedDelayParameters _parameters)
+void SimpleVibrato::setParameters(TimeModulatedDelayParameters _parameters)
 {
 	// --- bulk copy
 	parameters = _parameters;
@@ -499,9 +499,9 @@ bool SimpleFlanger::processAudioFrame(const float* inputFrame,		/* ptr to one fr
 	return stereoDelay.processAudioFrame(inputFrame, outputFrame, inputChannels, outputChannels);
 }
 
-ModulatedDelayParameters SimpleFlanger::getParameters() const { return parameters; }
+TimeModulatedDelayParameters SimpleFlanger::getParameters() const { return parameters; }
 
-void SimpleFlanger::setParameters(ModulatedDelayParameters _parameters)
+void SimpleFlanger::setParameters(TimeModulatedDelayParameters _parameters)
 {
 	// --- bulk copy
 	parameters = _parameters;
@@ -581,9 +581,9 @@ bool SimpleChorus::processAudioFrame(const float* inputFrame,		/* ptr to one fra
 	return stereoDelay.processAudioFrame(inputFrame, outputFrame, inputChannels, outputChannels);
 }
 
-ModulatedDelayParameters SimpleChorus::getParameters() const { return parameters; }
+TimeModulatedDelayParameters SimpleChorus::getParameters() const { return parameters; }
 
-void SimpleChorus::setParameters(ModulatedDelayParameters _parameters)
+void SimpleChorus::setParameters(TimeModulatedDelayParameters _parameters)
 {
 	// --- bulk copy
 	parameters = _parameters;
@@ -596,6 +596,7 @@ void SimpleChorus::setParameters(ModulatedDelayParameters _parameters)
 
 	DigitalDelayParameters<DefaultSideChainSignalProcessorParameters> delayParameters = stereoDelay.getParameters();
 	delayParameters.feedback_Pct = parameters.feedback_Pct;
+    delayParameters.mix = parameters.mix;
 	stereoDelay.setParameters(delayParameters);
 }
 
