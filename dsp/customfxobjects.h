@@ -1469,8 +1469,8 @@ struct TimeModulatedDelayParameters
 	timeModulatedDelayAlgorithm algorithm = timeModulatedDelayAlgorithm::kFlanger; ///< mod delay algorithm
 	double lfoRate_Hz = 0.0;	///< mod delay LFO rate in Hz
 	double lfoDepth_Pct = 0.0;	///< mod delay LFO depth in %
-	double mix = 0.0;	///< mod delay LFO depth in %
 	double feedback_Pct = 0.0;	///< feedback in %
+	double mix = 0.0;	///< mod delay LFO depth in %
 };
 
 /**
