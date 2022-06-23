@@ -945,6 +945,58 @@ private:
 };
 
 /**
+\class DigitalDelayAnalogEmulationParameters
+\ingroup Custom-FX-Objects
+\brief
+Custom parameter structure for the Analog Emulation behaviour of a DigitalDelay object.
+
+\author Steve Dwyer
+\remark This object is intended to be used as a member of the DigitalDelayParameters class.
+\version Revision : 1.0
+\date Date : 2022 / 06 / 23
+*/
+class DigitalDelayAnalogEmulationParameters {
+public:
+
+    DigitalDelayAnalogEmulationParameters() = default;
+    ~DigitalDelayAnalogEmulationParameters() = default;
+
+    // Explicitly use default copy constructor
+    DigitalDelayAnalogEmulationParameters(const DigitalDelayAnalogEmulationParameters&) = default;
+
+    // Copy assignment operator
+    /** all FXObjects parameter objects require overloaded= operator so remember to add new entries if you add new variables. */
+    DigitalDelayAnalogEmulationParameters& operator=(
+        const DigitalDelayAnalogEmulationParameters& params)
+    // need this override for collections to work
+    {
+        if (this == &params)
+            return *this;
+
+        emulateAnalog = params.emulateAnalog;
+        filterFc_Hz = params.filterFc_Hz;
+        noiseMix = params.noiseMix;
+
+        return *this;
+    }
+
+    // Move constructor
+    DigitalDelayAnalogEmulationParameters(DigitalDelayAnalogEmulationParameters&& params) noexcept
+        : emulateAnalog{params.emulateAnalog},
+          filterFc_Hz{params.filterFc_Hz},
+          noiseMix{params.noiseMix}
+    {
+    }
+
+    // Suppress generation of move assignment operator
+    DigitalDelayAnalogEmulationParameters& operator=(DigitalDelayAnalogEmulationParameters&&) = default;
+
+    bool emulateAnalog = false;
+    double filterFc_Hz = 5120;
+    double noiseMix = 0.2;
+};
+
+/**
 \class DigitalDelayParameters
 \ingroup Custom-FX-Objects
 \brief
@@ -983,7 +1035,7 @@ public:
         leftDelay_mSec = params.leftDelay_mSec;
         rightDelay_mSec = params.rightDelay_mSec;
         delayRatio_Pct = params.delayRatio_Pct;
-        emulateAnalog = params.emulateAnalog;
+        analogEmulation = params.analogEmulation;
 
         sideChainSignalProcessorParameters = params.sideChainSignalProcessorParameters;
 
@@ -1000,14 +1052,13 @@ public:
           leftDelay_mSec{params.leftDelay_mSec},
           rightDelay_mSec{params.rightDelay_mSec},
           delayRatio_Pct{params.delayRatio_Pct},
-          emulateAnalog{params.emulateAnalog},
+          analogEmulation{params.analogEmulation},
           sideChainSignalProcessorParameters{params.sideChainSignalProcessorParameters}
     {
     }
 
     // Suppress generation of move assignment operator
-    DigitalDelayParameters<SideChainProcessorParams>& operator=(DigitalDelayParameters<SideChainProcessorParams>&&)
-    = default;
+    DigitalDelayParameters<SideChainProcessorParams>& operator=(DigitalDelayParameters<SideChainProcessorParams>&&) = delete;
 
     // --- individual parameters
     delayAlgorithm algorithm = delayAlgorithm::kNormal; ///< delay algorithm
@@ -1019,7 +1070,7 @@ public:
     double leftDelay_mSec = 0.0; ///< left delay time
     double rightDelay_mSec = 0.0; ///< right delay time
     double delayRatio_Pct = 0.0; ///< delay ratio: right length = (delayRatio)*(left length)
-    bool emulateAnalog = false;
+    DigitalDelayAnalogEmulationParameters analogEmulation;
 
     // Any parameters required for the Side Chain Processor
     SideChainProcessorParams sideChainSignalProcessorParameters;
@@ -1235,7 +1286,7 @@ public:
     }
 
 private:
-    double getOutputMix(double xn, double yn) const
+    double getOutputMix(double xn, const double yn) const
     {
         const double dryMix = 1.0 - mix;
         const double wetMix = sideChainSignalProcessor.processAudioSample(xn) * mix;
@@ -1243,18 +1294,33 @@ private:
         return (dryMix * xn + wetMix * yn) * level_dB;
     }
 
-    double filter(double yn)
+    static double mixWithWhiteNoise(const double xn, const double noiseMix)
     {
-        if (parameters.emulateAnalog)
+        const double whiteNoise = doWhiteNoise();
+        const double yn = (1 - noiseMix) * xn + noiseMix * whiteNoise * xn;
+
+        return yn;
+    }
+
+    double emulateAnalogDecay(double yn)
+    {
+        const DigitalDelayAnalogEmulationParameters analogEmulation = parameters.analogEmulation;
+        const bool emulateAnalog = analogEmulation.emulateAnalog;
+        if (emulateAnalog)
         {
-            yn = zvaFilter.processAudioSample(yn);
+            ZVAFilterParameters filterParams = zvaFilter.getParameters();
+            filterParams.fc = analogEmulation.filterFc_Hz;
+            filterParams.matchAnalogNyquistLPF = true;
+            zvaFilter.setParameters(filterParams);
+
+            yn = zvaFilter.processAudioSample(mixWithWhiteNoise(yn, analogEmulation.noiseMix));
         }
         return yn;
     }
 
     double getDn(double xn, double yn)
     {
-        return xn + filter((parameters.feedback_Pct * 0.01) * yn);
+        return xn + emulateAnalogDecay(parameters.feedback_Pct * 0.01 * yn);
     }
 
     void updateParameters(const DigitalDelayParameters<SideChainProcessorParams>& _parameters)
