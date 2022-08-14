@@ -295,6 +295,10 @@ void Phaser::setParameters(const PhaserParameters& params)
     parameters = params;
 }
 
+// Define static constants outside the class definition
+const double DigitalDelayAnalogEmulationParameters::analogEmulationDefaultFilterFcHz = 14700.0;
+const double DigitalDelayAnalogEmulationParameters::analogEmulationDefaultNoiseMixPct = 10.0;
+
 DelayGainCalculator::DelayGainCalculator() = default; /* C-TOR */
 DelayGainCalculator::~DelayGainCalculator() = default; /* D-TOR */
 

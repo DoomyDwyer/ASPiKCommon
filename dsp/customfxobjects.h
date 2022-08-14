@@ -975,7 +975,7 @@ public:
 
         emulateAnalog = params.emulateAnalog;
         filterFc_Hz = params.filterFc_Hz;
-        noiseMix = params.noiseMix;
+        noiseMix_Pct = params.noiseMix_Pct;
 
         return *this;
     }
@@ -984,7 +984,7 @@ public:
     DigitalDelayAnalogEmulationParameters(DigitalDelayAnalogEmulationParameters&& params) noexcept
         : emulateAnalog{params.emulateAnalog},
           filterFc_Hz{params.filterFc_Hz},
-          noiseMix{params.noiseMix}
+          noiseMix_Pct{params.noiseMix_Pct}
     {
     }
 
@@ -992,8 +992,10 @@ public:
     DigitalDelayAnalogEmulationParameters& operator=(DigitalDelayAnalogEmulationParameters&&) = default;
 
     bool emulateAnalog = false;
-    double filterFc_Hz = 5120;
-    double noiseMix = 0.2;
+    static const double analogEmulationDefaultFilterFcHz;
+    static const double analogEmulationDefaultNoiseMixPct;
+    double filterFc_Hz = analogEmulationDefaultFilterFcHz;
+    double noiseMix_Pct = analogEmulationDefaultNoiseMixPct;
 };
 
 /**
@@ -1313,7 +1315,7 @@ private:
             filterParams.matchAnalogNyquistLPF = true;
             zvaFilter.setParameters(filterParams);
 
-            yn = zvaFilter.processAudioSample(mixWithWhiteNoise(yn, analogEmulation.noiseMix));
+            yn = mixWithWhiteNoise(zvaFilter.processAudioSample(yn), analogEmulation.noiseMix_Pct * 0.01);
         }
         return yn;
     }
